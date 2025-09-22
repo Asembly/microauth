@@ -3,7 +3,6 @@ package asembly.auth_service.config;
 import asembly.auth_service.security.CustomUserDetailsService;
 import asembly.auth_service.security.JwtEntryPoint;
 import asembly.auth_service.security.JwtFilter;
-import asembly.auth_service.security.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,8 +28,6 @@ public class SecurityConfig {
     private JwtEntryPoint jwtEntryPoint;
     @Autowired
     private JwtFilter jwtFilter;
-    @Autowired
-    private JwtService jwtService;
 
     @Bean
     public JwtFilter filter()

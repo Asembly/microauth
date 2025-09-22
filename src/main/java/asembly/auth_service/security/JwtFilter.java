@@ -1,5 +1,7 @@
 package asembly.auth_service.security;
 
+import asembly.auth_service.config.EnvConfig;
+import asembly.util.Jwt;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,9 +19,10 @@ import java.io.IOException;
 @Component
 public class JwtFilter extends OncePerRequestFilter {
     @Autowired
-    private JwtService jwtService;
-    @Autowired
     private CustomUserDetailsService userDetailsService;
+    @Autowired
+    private EnvConfig envConfig;
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -28,8 +31,8 @@ public class JwtFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
-            if (jwt != null && jwtService.verifyJwt(jwt)) {
-                String username = jwtService.getUsernameFromJwt(jwt);
+            if (jwt != null && Jwt.verifyJwt(jwt, envConfig.secret)) {
+                String username = Jwt.getUsernameFromJwt(jwt, envConfig.secret);
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(

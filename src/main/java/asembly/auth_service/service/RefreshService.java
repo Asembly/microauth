@@ -1,17 +1,17 @@
 package asembly.auth_service.service;
 
+import asembly.auth_service.config.EnvConfig;
 import asembly.auth_service.entity.RefreshToken;
 import asembly.auth_service.mapper.TokenMapper;
 import asembly.auth_service.repository.RefreshRepository;
-import asembly.auth_service.security.JwtService;
 import asembly.dto.auth.token.AccessResponse;
 import asembly.dto.auth.token.RefreshResponse;
 import asembly.util.GeneratorId;
+import asembly.util.Jwt;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -26,15 +26,13 @@ import java.util.UUID;
 @NoArgsConstructor
 public class RefreshService {
 
-    @Value("${spring.jwt.refresh.expiration}")
-    private Long refreshTokenExpiration;
 
     @Autowired
     private RefreshRepository refreshTokenRepository;
     @Autowired
-    private JwtService jwtService;
-    @Autowired
     private TokenMapper tokenMapper;
+    @Autowired
+    private EnvConfig envConfig;
 
     public ResponseEntity<String> logout(String refresh_token)
     {
@@ -49,7 +47,7 @@ public class RefreshService {
                     GeneratorId.generateShortUuid(),
                     user_id,
                     UUID.randomUUID().toString(),
-                    Timestamp.from(Instant.now().plusMillis(refreshTokenExpiration)).getTime()
+                    Timestamp.from(Instant.now().plusMillis(envConfig.exp_refresh)).getTime()
                 );
 
         refreshTokenRepository.save(token);
@@ -76,14 +74,19 @@ public class RefreshService {
             return ResponseEntity.badRequest().body("TODO");
         }
 
-        String newJwt = jwtService.genJwt(AuthService.userSession.username());
+        log.info("JWT SECRET _-------------- {}", envConfig.secret);
+
+        String newJwt = Jwt.genJwt(
+                AuthService.userSession.username(),
+                envConfig.secret,
+                envConfig.exp_access);
 
         if(newJwt == null)
             return ResponseEntity.badRequest().body("TODO");
 
         return ResponseEntity.ok(new AccessResponse(
                 newJwt,
-                jwtService.getExpiresAt(newJwt).getTime()));
+                Jwt.getExpiresAt(newJwt, envConfig.secret).getTime()));
     }
 
     public boolean isTokenExpired(RefreshToken token) {
