@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.concurrent.CompletableFuture;
-
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
@@ -32,12 +30,12 @@ public class AuthController {
     }
 
     @PostMapping("/sign-up")
-    public CompletableFuture<ResponseEntity<?>> signUp(@RequestBody AuthRequest user) {
+    public ResponseEntity<?>signUp(@RequestBody AuthRequest user) {
         return authService.signUp(user);
     }
 
     @PostMapping("/sign-in")
-    public CompletableFuture<ResponseEntity<?>> signIn(@RequestBody AuthRequest userDto){
+    public ResponseEntity<?> signIn(@RequestBody AuthRequest userDto){
         return authService.signIn(userDto);
     }
 

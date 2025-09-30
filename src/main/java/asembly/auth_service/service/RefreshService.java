@@ -1,11 +1,15 @@
 package asembly.auth_service.service;
 
+import asembly.auth_service.client.UserClient;
 import asembly.auth_service.config.EnvConfig;
 import asembly.auth_service.entity.RefreshToken;
+import asembly.auth_service.exception.ErrorResponseParser;
 import asembly.auth_service.mapper.TokenMapper;
 import asembly.auth_service.repository.RefreshRepository;
 import asembly.dto.auth.token.AccessResponse;
 import asembly.dto.auth.token.RefreshResponse;
+import asembly.exception.TokenExpiredException;
+import asembly.exception.TokenNotFoundException;
 import asembly.util.GeneratorId;
 import asembly.util.Jwt;
 import lombok.AllArgsConstructor;
@@ -26,17 +30,26 @@ import java.util.UUID;
 @NoArgsConstructor
 public class RefreshService {
 
-
     @Autowired
     private RefreshRepository refreshTokenRepository;
+
     @Autowired
     private TokenMapper tokenMapper;
+
     @Autowired
     private EnvConfig envConfig;
 
+    @Autowired
+    private UserClient userClient;
+
+    @Autowired
+    private ErrorResponseParser parser;
+
     public ResponseEntity<String> logout(String refresh_token)
     {
-        var response = refreshTokenRepository.findByToken(refresh_token).orElseThrow();
+        var response = refreshTokenRepository.findByToken(refresh_token).orElseThrow(
+                () -> new TokenNotFoundException("Refresh")
+        );
         refreshTokenRepository.delete(response);
         return ResponseEntity.ok("User logout.");
     }
@@ -54,6 +67,7 @@ public class RefreshService {
 
         return ResponseEntity.ok(tokenMapper.toTokenResponse(token));
     }
+
     public RefreshResponse refreshTokenCheck(String user_id)
     {
         var optionalRefresh = refreshTokenRepository.findTokenByUserId(user_id);
@@ -66,23 +80,21 @@ public class RefreshService {
 
 
     public ResponseEntity<?> updateAccessToken(String refresh_token){
-        var token = refreshTokenRepository.findByToken(refresh_token).orElseThrow();
+        var token = refreshTokenRepository.findByToken(refresh_token).orElseThrow(
+                () -> new TokenNotFoundException("Refresh")
+        );
 
-        if(isTokenExpired(token))
-        {
+        if (isTokenExpired(token)) {
             refreshTokenRepository.delete(token);
-            return ResponseEntity.badRequest().body("TODO");
+            throw new TokenExpiredException("Refresh");
         }
 
-        log.info("JWT SECRET _-------------- {}", envConfig.secret);
+        var user = userClient.getUserById(token.getUser_id()).getBody();
 
         String newJwt = Jwt.genJwt(
-                AuthService.userSession.username(),
+                user.username(),
                 envConfig.secret,
                 envConfig.exp_access);
-
-        if(newJwt == null)
-            return ResponseEntity.badRequest().body("TODO");
 
         return ResponseEntity.ok(new AccessResponse(
                 newJwt,

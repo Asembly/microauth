@@ -8,19 +8,22 @@ spring:
     url: jdbc:postgresql://localhost:5433/db
     password: ${SPRING_DATASOURCE_PASSWORD}
     username: ${SPRING_DATASOURCE_USERNAME}
+  kafka:
+    bootstrap-servers: kafka:9090
   jwt:
+    secret: ${SPRING_JWT_SECRET}
     access:
       expiration: 3600000
     refresh:
-      expiration: 2419200000
-    secret: ${SPRING_JWT_SECRET}
-  kafka:
-    bootstrap-servers: localhost:9092
+      expiration: 604800000
+server:
+  port: 8080
 eureka:
   instance:
     prefer-ip-address: true
   client:
-    fetch-registry: false
-    register-with-eureka: false
     service-url:
-      defaultZone: http://localhost:9099/eureka
+      defaultZone: ${SPRING_EUREKA_CLIENT_SERVICE-URL}
+feign:
+  service:
+    user-service: "http://localhost:8081"

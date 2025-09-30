@@ -1,144 +1,70 @@
 package asembly.auth_service.service;
 
+import asembly.auth_service.client.UserClient;
 import asembly.auth_service.config.EnvConfig;
+import asembly.auth_service.exception.ErrorResponseParser;
 import asembly.dto.auth.AuthRequest;
 import asembly.dto.auth.AuthResponse;
-import asembly.dto.auth.AuthResult;
-import asembly.dto.auth.AuthStatus;
 import asembly.dto.auth.token.AccessResponse;
+import asembly.dto.user.UserCreateRequest;
+import asembly.dto.user.UserResponse;
+import asembly.exception.PasswordNotRequiredException;
+import asembly.exception.UserNotFoundException;
 import asembly.session.UserSessionInfo;
 import asembly.util.Jwt;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
+@Slf4j
 @Service
 public class AuthService {
 
     @Autowired
-    private FutureService futureService;
-    @Autowired
     private RefreshService refreshService;
+
     @Autowired
     private EnvConfig envConfig;
 
+    @Autowired
+    private ErrorResponseParser parser;
+
+    @Autowired
+    private UserClient userClient;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     public static UserSessionInfo userSession;
 
-    public CompletableFuture<ResponseEntity<?>> signIn(AuthRequest dto){
-        return futureService.auth(dto.username(), dto.password(), "signin-requests")
-                .orTimeout(5, TimeUnit.SECONDS)
-                .exceptionally(ex -> {
-                    if(ex instanceof TimeoutException)
-                    {
-                        return new AuthResult(
-                                AuthStatus.TIMEOUT_SERVER,
-                                null,
-                                null
-                        );
-                    }else{
-                        return new AuthResult(
-                                AuthStatus.INTERNAL_SERVER_ERROR,
-                                null,
-                                null
-                        );
-                    }
-                })
-                .thenApply(result -> {
-                    switch(result.status())
-                    {
-                        case VALID -> {
-                            userSession = new UserSessionInfo(dto.username(), dto.password());
-                            return authResponse(result.user_id(), result.username());
-                        }
-                        case USER_NOT_FOUND -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.NOT_FOUND)
-                                    .body("User not found");
-                        }
-                        case INVALID_CREDENTIALS -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.UNAUTHORIZED)
-                                    .body("Invalid credentials");
-                        }
-                        case TIMEOUT_SERVER -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.GATEWAY_TIMEOUT)
-                                    .body("Server timeout");
-                        }
-                        default -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                    .body("Internal server error");
-                        }
-                    }
-                });
+    public ResponseEntity<?> signIn(AuthRequest dto){
+        var user = userClient.getUserByUsername(dto.username()).getBody();
+
+        if (user == null)
+            throw new UserNotFoundException();
+
+        if (!passwordEncoder.matches(dto.password(), user.password()))
+            throw new PasswordNotRequiredException();
+        return authResponse(user);
     }
 
-    public CompletableFuture<ResponseEntity<?>> signUp(AuthRequest dto){
-        return futureService.auth(dto.username(), dto.password(), "signup-requests")
-                .orTimeout(5, TimeUnit.SECONDS)
-                .exceptionally(ex -> {
-                    if(ex instanceof TimeoutException)
-                    {
-                        return new AuthResult(
-                                AuthStatus.TIMEOUT_SERVER,
-                                null,
-                                null
-                        );
-                    }else{
-                        return new AuthResult(
-                                AuthStatus.INTERNAL_SERVER_ERROR,
-                                null,
-                                null
-                        );
-                    }
-                })
-                .thenApply(result -> {
-                    switch(result.status())
-                    {
-                        case VALID -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.OK)
-                                    .body("Registration successful");
-                        }
-                        case USER_ALREADY_EXIST -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.BAD_REQUEST)
-                                    .body("User already exits");
-                        }
-                        case INVALID_CREDENTIALS -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.UNAUTHORIZED)
-                                    .body("Invalid credentials");
-                        }
-                        case TIMEOUT_SERVER -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.GATEWAY_TIMEOUT)
-                                    .body("Server timeout");
-                        }
-                        default -> {
-                            return ResponseEntity
-                                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                    .body("Internal server error");
-                        }
-                    }
-                });
+    public ResponseEntity<?> signUp(AuthRequest dto){
+        return userClient.create(new UserCreateRequest(
+                dto.username(),
+                passwordEncoder.encode(dto.password()))
+        );
     }
 
-    public ResponseEntity<AuthResponse> authResponse(String user_id, String username)
+    public ResponseEntity<AuthResponse> authResponse(UserResponse dto)
     {
-        var refresh = refreshService.refreshTokenCheck(user_id);
-
-        var access = Jwt.genJwt(username, envConfig.secret, envConfig.exp_access);
+        var refresh = refreshService.refreshTokenCheck(dto.id());
+        var access = Jwt.genJwt(dto.username(), envConfig.secret, envConfig.exp_access);
 
         return ResponseEntity.ok(new AuthResponse(
-                user_id,
-                username,
+                dto.id(),
+                dto.username(),
                 new AccessResponse(access, Jwt.getExpiresAt(access, envConfig.secret).getTime()),
                 refresh
         ));
