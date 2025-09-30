@@ -20,7 +20,6 @@ public class ErrorResponseParser {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             String message = rootNode.path("message").asText();
 
-            // Обрабатываем вложенный JSON
             if (message != null && message.startsWith("{") && message.endsWith("}")) {
                 JsonNode innerNode = objectMapper.readTree(message);
                 return innerNode.path("message").asText("External service error");
