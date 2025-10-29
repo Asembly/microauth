@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: auth-service
+  jpa:
+    hibernate:
+      ddl-auto: update
+  datasource:
+    url: jdbc:postgresql://localhost:5433/db
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    username: ${SPRING_DATASOURCE_USERNAME}
+  kafka:
+    bootstrap-servers: kafka:9090
+  jwt:
+    secret: ${SPRING_JWT_SECRET}
+    access:
+      expiration: 3600000
+    refresh:
+      expiration: 604800000
+server:
+  port: 8080
+eureka:
+  instance:
+    prefer-ip-address: true
+    hostname: auth-service
+  client:
+    service-url:
+      defaultZone: ${SPRING_EUREKA_CLIENT_SERVICE-URL}
+feign:
+  service:
+    user-service: ${FEIGN_SERVICE_USER}
