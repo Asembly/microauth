@@ -18,7 +18,7 @@
         <server>
             <id>github</id>
             <username>Asembly</username>
-            <password>${env.GITHUB_TOKEN}</password>
+            <password>${github.token}</password>
         </server>
     </servers>
 </settings>
